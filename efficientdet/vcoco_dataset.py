@@ -13,7 +13,7 @@ import cv2
 import random
 from tqdm.autonotebook import tqdm
 
-import datasets.vcoco.vsrl_utils as vu
+# import datasets.vcoco.vsrl_utils as vu
 from efficientdet.help_function import *
 
 
@@ -49,7 +49,7 @@ class VCOCO_Dataset(Dataset):
         self.color_prob = color_prob
 
         self.coco = COCO(os.path.join(self.root_dir, "coco/annotations", "instances_trainval2014.json"))
-        self.vcoco = vu.load_vcoco("vcoco_"+set, os.path.join(self.root_dir, "data"))
+        # self.vcoco = vu.load_vcoco("vcoco_"+set, os.path.join(self.root_dir, "data"))
 
         self.image_ids = self.load_ids()
         self.load_classes()

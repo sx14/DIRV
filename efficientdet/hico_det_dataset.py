@@ -12,7 +12,7 @@ import cv2
 
 from tqdm.autonotebook import tqdm
 
-import datasets.vcoco.vsrl_utils as vu
+# import datasets.vcoco.vsrl_utils as vu
 from efficientdet.vcoco_dataset import *
 from efficientdet.help_function import *
 

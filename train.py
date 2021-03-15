@@ -3,13 +3,16 @@ import os
 import argparse
 import traceback
 import thop
+import time
 
 import torch
 import yaml
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from efficientdet.vcoco_dataset import VCOCO_Dataset, Resizer, Normalizer, Augmenter, collater
+from efficientdet.vcoco_dataset import Resizer, Normalizer, Augmenter, collater
+# from efficientdet.vcoco_dataset import VCOCO_Dataset, Resizer, Normalizer, Augmenter, collater
+
 from efficientdet.hico_det_dataset import HICO_DET_Dataset
 
 from backbone import EfficientDetBackbone
@@ -19,6 +22,8 @@ from utils.sync_batchnorm import patch_replication_callback, SynchronizedBatchNo
 
 from efficientdet.loss import FocalLoss, Union_Loss, Instance_Loss
 from utils.utils import replace_w_sync_bn, CustomDataParallel, get_last_weights, init_weights
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,2"
 
 class Params:
     def __init__(self, project_file):
@@ -45,7 +50,7 @@ def get_args():
                                                                    ' very final stage then switch to \'sgd\'')
     parser.add_argument('--alpha', type=float, default=0.25)
     parser.add_argument('--gamma', type=float, default=2)
-    parser.add_argument('--num_epochs', type=int, default=200)
+    parser.add_argument('--num_epochs', type=int, default=20)
     parser.add_argument('--val_interval', type=int, default=1, help='Number of epoches between valing phases')
     parser.add_argument('--save_interval', type=int, default=500, help='Number of steps between saving')
     parser.add_argument('--log_interval', type=int, default=5, help='Number of steps between logging')
@@ -54,7 +59,7 @@ def get_args():
                         help='Early stopping\'s parameter: minimum change loss to qualify as an improvement')
     parser.add_argument('--es_patience', type=int, default=0,
                         help='Early stopping\'s parameter: number of epochs with no improvement after which training will be stopped. Set to 0 to disable this technique.')
-    parser.add_argument('--data_path', type=str, default='datasets/', help='the root folder of dataset')
+    parser.add_argument('--data_path', type=str, default='data/', help='the root folder of dataset')
     parser.add_argument('--log_path', type=str, default='logs/')
     parser.add_argument('--load_weights', type=str, default=None,
                         help='whether to load weights from a checkpoint, set None to initialize, set \'last\' to load last checkpoint')
@@ -166,13 +171,14 @@ def train(opt):
                                                         Resizer(input_sizes[opt.compound_coef])])
 
     if opt.project == "vcoco":
-        training_set = VCOCO_Dataset(root_dir="./datasets/vcoco", set=params.train_set, color_prob=1,
-                               transform=train_transform)
-        val_set = VCOCO_Dataset(root_dir="./datasets/vcoco", set=params.val_set,
-                          transform=val_transform)
+        # training_set = VCOCO_Dataset(root_dir="./datasets/vcoco", set=params.train_set, color_prob=1,
+        #                        transform=train_transform)
+        # val_set = VCOCO_Dataset(root_dir="./datasets/vcoco", set=params.val_set,
+        #                   transform=val_transform)
+        exit(-999)
     else:
-        training_set = HICO_DET_Dataset(root_dir="datasets/hico_20160224_det", set="train", color_prob=1, transform=train_transform)
-        val_set = HICO_DET_Dataset(root_dir="datasets/hico_20160224_det", set="test", transform=val_transform)
+        training_set = HICO_DET_Dataset(root_dir="data/hico_20160224_det", set="train", color_prob=1, transform=train_transform)
+        val_set = HICO_DET_Dataset(root_dir="data/hico_20160224_det", set="test", transform=val_transform)
 
     training_generator = DataLoader(training_set, **training_params)
 
@@ -193,9 +199,10 @@ def train(opt):
         else:
             weights_path = get_last_weights(opt.saved_path)
         try:
-            last_step = int(os.path.basename(weights_path).split('_')[-1].split('.')[0])
+            # last_step = int(os.path.basename(weights_path).split('_')[-1].split('.')[0])
             # last_epoch = int(os.path.basename(weights_path).split('_')[-2].split('.')[0]) + 1
-            # last_step = last_epoch * len(training_generator)
+            last_epoch = int(os.path.basename(weights_path).split('_')[-1].split('.')[0])
+            last_step = last_epoch * len(training_generator)
         except:
             last_step = 0
 
@@ -249,6 +256,16 @@ def train(opt):
     else:
         use_sync_bn = False
 
+    # if os.path.exists('nohup.out'):
+    #     os.remove('nohup.out')
+    #     f = open('nohup.out', 'w')
+    #     f.close()
+
+
+    if os.path.exists(opt.log_path):
+        import shutil
+        shutil.rmtree(opt.log_path)
+    os.makedirs(opt.log_path)
     writer = SummaryWriter(opt.log_path + f'/{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}/')
 
     # warp the model with loss function, to reduce the memory usage on gpu0 and speedup
@@ -285,6 +302,7 @@ def train(opt):
     step = max(0, last_step)
 
     num_iter_per_epoch = (len(training_generator) + opt.accumulate_batch - 1) // opt.accumulate_batch
+    start_time = time.time()
 
     try:
         for epoch in range(opt.num_epochs):
@@ -292,7 +310,7 @@ def train(opt):
             if epoch < last_epoch:
                 continue
 
-            if epoch in [120, 130]:
+            if epoch in [12, 16]:
                 optimizer.param_groups[0]['lr'] = optimizer.param_groups[0]['lr'] / 10
 
             epoch_loss = []
@@ -361,14 +379,13 @@ def train(opt):
                         writer.add_scalar('learning_rate', current_lr, step)
 
                     if iter % 20 == 0:
+                        end_time = time.time()
                         print(
                             'Step: {}. Epoch: {}/{}. Iteration: {}/{}. Union loss: {:.5f}. Instance loss: {:.5f}.  '
-                            ' Total loss: {:.5f}. Learning rate: {:.5f}'.format(
-                                step, epoch, opt.num_epochs, (iter + 1) // opt.accumulate_batch, num_iter_per_epoch, union_loss, instance_loss, loss, current_lr))
+                            ' Total loss: {:.5f}. Learning rate: {:.5f} Time: {:.2f}s'.format(
+                                step, epoch, opt.num_epochs, (iter + 1) // opt.accumulate_batch, num_iter_per_epoch, union_loss, instance_loss, loss, current_lr, end_time-start_time))
+                        start_time = time.time()
 
-                    if step % opt.save_interval == 0 and step > 0:
-                        save_checkpoint(model, f'efficientdet-d{opt.compound_coef}_{epoch}_{step}.pth')
-                        print('checkpoint...')
 
                 except Exception as e:
                     print('[Error]', traceback.format_exc())
@@ -376,6 +393,9 @@ def train(opt):
                     continue
 
             # scheduler.step(np.mean(epoch_loss))
+
+            save_checkpoint(model, f'efficientdet-d{opt.compound_coef}_{epoch}.pth')
+            print('checkpoint...')
 
             if epoch % opt.val_interval == 0:
                 # model.eval()
@@ -479,7 +499,7 @@ def train(opt):
                     best_loss = loss
                     best_epoch = epoch
 
-                    save_checkpoint(model, f'efficientdet-d{opt.compound_coef}_{epoch}_{step}.pth')
+                    save_checkpoint(model, f'efficientdet-d{opt.compound_coef}_{best_epoch}_best.pth')
 
                 # model.train()
 
@@ -493,7 +513,7 @@ def train(opt):
                 #     print('[Info] Stop training at epoch {}. The lowest loss achieved is {}'.format(epoch, loss))
                 #     break
     except KeyboardInterrupt:
-        save_checkpoint(model, f'efficientdet-d{opt.compound_coef}_{epoch}_{step}.pth')
+        # save_checkpoint(model, f'efficientdet-d{opt.compound_coef}_{epoch}_{step}.pth')
         writer.close()
     writer.close()
 

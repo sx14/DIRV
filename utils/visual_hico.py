@@ -28,7 +28,7 @@ obj_list = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train'
            'refrigerator', '', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier',
            'toothbrush']
 
-with open("/DATA1/Benchmark/hico_20160224_det/hico_processed/hoi_list.json", "r") as file:
+with open("data/hico_20160224_det/hico_processed/hoi_list.json", "r") as file:
     hois = json.load(file)
 num_hois = len(hois)
 union_action_list = {}

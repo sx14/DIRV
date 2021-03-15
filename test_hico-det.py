@@ -32,7 +32,7 @@ from utils.utils import preprocess, invert_affine, postprocess, postprocess_hoi,
 from utils.timer import Timer
 from utils.visual_hico import visual_hico
 from Generate_HICO_detection import Generate_HICO_detection
-
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 ap = argparse.ArgumentParser()
 ap.add_argument('-p', '--project', type=str, default='hico-det', help='project file that contains parameters')
@@ -43,7 +43,7 @@ ap.add_argument('--cuda', type=int, default=1)
 ap.add_argument('--device', type=int, default=0)
 ap.add_argument('--float16', type=int, default=0)
 ap.add_argument('--override', type=int, default=0, help='override previous bbox results file if exists')
-ap.add_argument('--data_dir', type=str, default='./datasets', help='the root folder of dataset')
+ap.add_argument('--data_dir', type=str, default='./data', help='the root folder of dataset')
 ap.add_argument('--need_visual', type=int, default=0, help='whether need to visualize the results')
 ap.add_argument('--flip_test', type=int, default=1, help='whether apply flip augmentation when testing')
 
